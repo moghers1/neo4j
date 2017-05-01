@@ -1,105 +1,78 @@
-##########################################################
 # crawl yelp listings and scrape data in preparation of neo4j graph analysis
-#
-##########################################################
 
 import requests
 from bs4 import BeautifulSoup
 import time
 import json
 
+
 def yelp_spider(page_start):
 	page = 0
 	while page <= page_start:
 		url = "https://www.yelp.com/search?find_desc=Restaurants&find_loc=Pittsburgh,+PA&start=" + str(page) +"&cflt=coffee"
-		source_code = requests.get(url)
-		plain_text = source_code.text
-		soup = BeautifulSoup(plain_text)
-
+		soup = soup_it(url)
+		
 		for link in soup.findAll('a', {'class': 'biz-name js-analytics-click'}):
 			
-			# crawl actual listing page
+			# get name of restaurant and save to file
+			ListingDict = {'Rest_Name': link.string}
+			json_appender(ListingDict, 'neo4j_listing.json')
+
+			# crawl main restaurant page
 			href = "https://www.yelp.com" + link.get('href')	
-
-			# get name of restaurant
-			dfRestName = []
-			rn = link.string
-			dfRestName.append(rn)
-
-			dict3 = {}
-			ListingDict = {'Rest_Name': v for v in dfRestName} 
-			dict3.update(ListingDict)
-
-			get_restaurant_reviews(href, dict3)
+			get_restaurant_reviews(href, ListingDict)
 
 		page += 10
 
 
-def get_restaurant_reviews(restaurant_url, restDict):
-	source_code = requests.get(restaurant_url)
-	plain_text = source_code.text
-	soup = BeautifulSoup(plain_text)
+def get_restaurant_reviews(restaurant_url, RestaurantDict):
+	soup = soup_it(restaurant_url)
 
-	# pull avg rating from main restaurant page
 	for rating in soup.findAll('div', {'class': 'biz-rating biz-rating-very-large clearfix'}):
-		dfRestReviews = []
-		rr0 = str(rating.contents[3].string.strip().replace(' ','|'))
-		spt = rr0.split('|')
-		rr1 = spt[0]
-		dfRestReviews.append(rr1)
-		
-		restaurantDict = {'Rest_Reviews': v for v in dfRestReviews} 	
-		restDict.update(restaurantDict)
 
+		# pull Restaurant avg rating and save to file
+		rest_review = rating.contents[3].string.strip().split()[0]
+		RestaurantDict.update({'Rest_Reviews': rest_review})
+		json_appender(RestaurantDict, 'neo4j_restaurant.json')
 
 	for link in soup.findAll('a', {'class': 'user-display-name js-analytics-click'}):
+		
+		# crawl user profile page
 		profile_href = "https://www.yelp.com" + link.get('href')
-		get_user_profile(profile_href, restDict)
+		get_user_profile(profile_href, RestaurantDict)
 
 
 def get_user_profile(profile_url, profileDict):
-	source_code = requests.get(profile_url)
-	plain_text = source_code.text
-	soup = BeautifulSoup(plain_text)
+	soup = soup_it(profile_url)
 
 	for profile in soup.findAll('div', {'class': 'user-profile_info arrange_unit'}): 
-
-		# get name
-		dfCustName = []
-		n = str(profile.contents[1].text)
-		dfCustName.append(n)
-
-		DictCustName = {'Cust_Name': v for v in dfCustName}
-		profileDict.update(DictCustName)
+		# get customer name
+		profileDict.update({'Cust_Name': profile.contents[1].text})
 
 		# get city and state
-		dfCustCity = []
-		dfCustState = []
-		loc = str(profile.contents[3].text.replace(',','|').replace(' ',''))
-		spt = loc.split('|')
-		c = spt[0]
-		s = spt[1]
-		dfCustCity.append(c)
-		DictCustCity = {'Cust_City': v for v in dfCustCity}
-		profileDict.update(DictCustCity)
-
-		dfCustState.append(s)
-		DictCustState = {'Cust_State': v for v in dfCustState}
-		profileDict.update(DictCustState)
+		c,s = profile.contents[3].text.replace(',','|').replace(' ','').split('|')
+		profileDict.update({'Cust_City':c, 'Cust_State':s})
 
 		# get total reviews
-		for review in profile.find_all('strong'):
-			dfTotReviews = []
-			r = str(review.text)
-			dfTotReviews.append(r)
-			DictTotReviews = {'Total_Reviews': v for v in dfTotReviews}
-			profileDict.update(DictTotReviews)
+		r = profile.find('strong').text
+		profileDict.update({'Total_Reviews':r})
 
-		# append data to json file
-		with open('neo4j_prep.json', 'a') as outfile:
-			json.dump(profileDict, outfile)
+		json_appender(profileDict, 'neo4j_profile.json')
 
 
-# crawl 1 page
-yelp_spider(0)
+def soup_it(url):
+	source_code = requests.get(url)
+	plain_text = source_code.text
+	soup = BeautifulSoup(plain_text)	
+	return soup
 
+
+# append data to json file
+def json_appender(file, file_name):
+	with open(file_name, 'a') as outfile:
+		json.dump(file, outfile, indent=2)
+
+
+if __name__=="__main__":
+	#crawl 1 page
+	yelp_spider(0)
