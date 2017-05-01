@@ -9,97 +9,77 @@ import time
 import json
 
 def yelp_spider(page_start):
-	page = 0
-	while page <= page_start:
-		url = "https://www.yelp.com/search?find_desc=Restaurants&find_loc=Pittsburgh,+PA&start=" + str(page) +"&cflt=coffee"
-		source_code = requests.get(url)
-		plain_text = source_code.text
-		soup = BeautifulSoup(plain_text)
+  page = 0
+  while page <= page_start:
+    url = "https://www.yelp.com/search?find_desc=Restaurants&find_loc=Pittsburgh,+PA&start=" + str(page) +"&cflt=coffee"
+    soup = soup_it(url)
 
-		for link in soup.findAll('a', {'class': 'biz-name js-analytics-click'}):
-			
-			# crawl actual listing page
-			href = "https://www.yelp.com" + link.get('href')	
+    for link in soup.findAll('a', {'class': 'biz-name js-analytics-click'}):
+      
+      # crawl actual listing page
+      href = "https://www.yelp.com" + link.get('href')  
 
-			# get name of restaurant
-			dfRestName = []
-			rn = link.string
-			dfRestName.append(rn)
+      ####this will setup a brand-new list and dictionary for every link
+      # get name of restaurant
+      dict3 = {'Rest_Name': link.string}
 
-			dict3 = {}
-			ListingDict = {'Rest_Name': v for v in dfRestName} 
-			dict3.update(ListingDict)
+      get_restaurant_reviews(href, dict3)
 
-			get_restaurant_reviews(href, dict3)
+    page += 10
 
-		page += 10
 
 
 def get_restaurant_reviews(restaurant_url, restDict):
-	source_code = requests.get(restaurant_url)
-	plain_text = source_code.text
-	soup = BeautifulSoup(plain_text)
+  soup = soup_it(restaurant_url)
 
-	# pull avg rating from main restaurant page
-	for rating in soup.findAll('div', {'class': 'biz-rating biz-rating-very-large clearfix'}):
-		dfRestReviews = []
-		rr0 = str(rating.contents[3].string.strip().replace(' ','|'))
-		spt = rr0.split('|')
-		rr1 = spt[0]
-		dfRestReviews.append(rr1)
-		
-		restaurantDict = {'Rest_Reviews': v for v in dfRestReviews} 	
-		restDict.update(restaurantDict)
+  # pull avg rating from main restaurant page
+  for rating in soup.findAll('div', {'class': 'biz-rating biz-rating-very-large clearfix'}):
+
+    #could just split on ' ' ? if replacing with |, split on space would do the same thing
+    #you could easly leave as separate lines for readabilty , I like single line things
+    rest_review = rating.contents[3].string.strip().split()[0]
+    restDict.update({'Rest_Reviews': rest_review})
 
 
-	for link in soup.findAll('a', {'class': 'user-display-name js-analytics-click'}):
-		profile_href = "https://www.yelp.com" + link.get('href')
-		get_user_profile(profile_href, restDict)
+  for link in soup.findAll('a', {'class': 'user-display-name js-analytics-click'}):
+    profile_href = "https://www.yelp.com" + link.get('href')
+    get_user_profile(profile_href, restDict)
 
 
+
+#adds the name,city,total_reviews AND writes the final dictionary
 def get_user_profile(profile_url, profileDict):
-	source_code = requests.get(profile_url)
-	plain_text = source_code.text
-	soup = BeautifulSoup(plain_text)
+  soup = soup_it(profile_url)
 
-	for profile in soup.findAll('div', {'class': 'user-profile_info arrange_unit'}): 
+  for profile in soup.findAll('div', {'class': 'user-profile_info arrange_unit'}): 
 
-		# get name
-		dfCustName = []
-		n = str(profile.contents[1].text)
-		dfCustName.append(n)
+    # get customer name
+    profileDict.update({'Cust_Name': profile.contents[1].text})
 
-		DictCustName = {'Cust_Name': v for v in dfCustName}
-		profileDict.update(DictCustName)
+    # get city and state
+    c,s = profile.contents[3].text.replace(',','|').replace(' ','').split('|')
+    profileDict.update({'Cust_City':c, 'Cust_State':s})
 
-		# get city and state
-		dfCustCity = []
-		dfCustState = []
-		loc = str(profile.contents[3].text.replace(',','|').replace(' ',''))
-		spt = loc.split('|')
-		c = spt[0]
-		s = spt[1]
-		dfCustCity.append(c)
-		DictCustCity = {'Cust_City': v for v in dfCustCity}
-		profileDict.update(DictCustCity)
+    # get total reviews
+    profileDict.update('Total_Reviews': profile.find('strong').text)
 
-		dfCustState.append(s)
-		DictCustState = {'Cust_State': v for v in dfCustState}
-		profileDict.update(DictCustState)
+    # append data to json file 
+    # i like the idea of a separate 'write' function, that way if you add more depths of spider, you can just reuse the function instead of rewriting the 2/3 lines of code
+    json_appender(profileDict)
 
-		# get total reviews
-		for review in profile.find_all('strong'):
-			dfTotReviews = []
-			r = str(review.text)
-			dfTotReviews.append(r)
-			DictTotReviews = {'Total_Reviews': v for v in dfTotReviews}
-			profileDict.update(DictTotReviews)
+#helper function to return the beautiful soup representation of a url
+def soup_it(url):
+  source_code = requests.get(profile_url)
+  plain_text = source_code.text
+  soup = BeautifulSoup(plain_text)
+  return soup
 
-		# append data to json file
-		with open('neo4j_prep.json', 'a') as outfile:
-			json.dump(profileDict, outfile)
+#could add in another input parameter of 'file_name' if you wanted this to be very reusable 
+def json_appender(profileDict):
+    with open('neo4j_prep.json', 'a') as outfile:
+        json.dump(profileDict, outfile)
 
-
-# crawl 1 page
-yelp_spider(0)
+if __name__=="__main__":
+    # crawl 1 page
+    yelp_spider(0)
 
