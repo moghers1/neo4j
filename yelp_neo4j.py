@@ -76,3 +76,4 @@ def json_appender(file, file_name):
 if __name__=="__main__":
 	#crawl 1 page
 	yelp_spider(0)
+
