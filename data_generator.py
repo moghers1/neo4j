@@ -7,9 +7,7 @@ import os
 
 
 
-# # # # #
-# STEP 1: # generate random values (numbers, letters, dates)
-# # # # #
+# STEP 1: generate random values (numbers, letters, dates)
 
 def randNum(n):
 	return int("".join([str(randint(0,9)) for _ in xrange(n)]))
@@ -32,9 +30,7 @@ def randEmail():
 
 
 
-# # # # #
-# STEP 2: # begin to create attributes of a person using random values created in STEP 1
-# # # # #
+# STEP 2: begin to create attributes of a person using random values created in STEP 1
 
 def demographic():
 	d = {"FIRST_NAME":randLetters(), "LAST_NAME":randLetters(),"GENDER":choice(["M","F"]), "SSN":randNum(9)}
@@ -49,9 +45,8 @@ def contact():
 	return d
 
 
-# # # # #
-# STEP 2: # combine all generators from above
-# # # # #
+
+# STEP 3: combine all generators from above
 
 def make_person():
 	person = {}

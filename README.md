@@ -26,7 +26,7 @@ WITH count(*) as dummy
 // import yelp user profile data
 CALL apoc.load.json("file:///tmp/Desktop/neo4j_profile.json") YIELD value AS profile
 CREATE (p:Profile {profile_id: profile.profile_id})
-SET p.name 			= profile.Rest_Name,
+SET 	p.name 			= profile.Rest_Name,
 	p.reviews 		= profile.Rest_Reviews,
 	p.name 			= profile.Cust_Name,
 	p.city 			= profile.Cust_City,
